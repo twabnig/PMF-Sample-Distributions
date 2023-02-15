@@ -1,0 +1,64 @@
+library(shiny)
+library(tidyverse)
+
+ui <- fluidPage(
+  titlePanel("Discrete, Random Sample Distributions of Vegetation Indices in 8-bit. The Law of Large Numbers guarantees a Convergence in Distribution."),
+  sidebarLayout(
+    sidebarPanel(
+      actionButton("play", "Sample"),
+      radioButtons("operation", label = "Choose Vegetation Index:",
+                   choices = c("Regular Addition (no VI)" = "add", "Regular subtraction (no VI)" = "subtract", 
+                               "Simple Ratio Index" = "divide", "Normalized Difference Vegetation Index" = "NDVI", "Uniform Relative Frequency Index" = "URFI", "Renormalized Difference Vegetation Index" = "RDVI", "Carotenoid Reflectance Index" = "CRI", "Optimized Non-Linear Index" = "ONLI", "Vegetation Index for Biomass Estimation" = "VIBE"),
+                   selected = "add"),
+      sliderInput("samples", label = "Number of Samples",
+                  min = 0, max = 1000000, value = 1, step = 100)
+    ),
+    mainPanel(
+      plotOutput("plot")
+    )
+  )
+)
+## 
+server <- function(input, output) {
+  observeEvent(input$play, {
+    dice1 <- sample(0:255, input$samples, replace = TRUE)
+    dice2 <- sample(0:255, input$samples, replace = TRUE)
+    
+    result <- numeric(input$samples)
+    if (input$operation == "add") {
+      result <- dice1 + dice2
+    } else if (input$operation == "subtract") {
+      result <- dice1 - dice2
+    } else if (input$operation == "divide") {
+      result <- dice1 / dice2
+    } else if (input$operation == "NDVI") {
+      result <- (dice1 - dice2)/(dice1 + dice2)
+    } else if (input$operation == "URFI") {
+      r <- (dice1 - dice2)/(dice1 + dice2)
+      r <- 2*r/(1+abs(r))
+      result <- round(r,2)
+    } else if (input$operation == "RDVI") {
+      result <- (dice1 - dice2)/(sqrt(dice1 + dice2))
+    } else if (input$operation == "CRI") {
+      result <- ((1/dice1) - (1/dice2))
+    } else if (input$operation == "ONLI") {
+      result <- ((1+0.05)*(((0.6*(dice1^2)))- dice2))/((0.6*dice1^2)+dice2+0.05)
+    } else if (input$operation == "VIBE") {
+      NORMALIZE <- function(x) {(x - min(x))/(max(x)- min(x))}
+      r <- (dice1 - dice2)/(dice1 + dice2)
+      sum_dice <- dice1+dice2
+      norm_sum_dice <- NORMALIZE(sum_dice)
+      vec <- ifelse(r<0, -1, 1)
+      result <- norm_sum_dice*vec
+    }
+    
+    df <- data.frame(Result = result)
+    barplot(table(df$Result), xlab="Index Value", ylab="Frequency")
+    
+    output$plot <- renderPlot({
+      barplot(table(df$Result), xlab="Index Value", ylab="Frequency")
+    })
+  })
+}
+
+shinyApp(ui = ui, server = server, options = list(height = 1080))
